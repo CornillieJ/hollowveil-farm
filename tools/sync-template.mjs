@@ -53,6 +53,7 @@ export const LIBRARY_PATHS = [
     'tests/inventory.test.ts',
     'tests/progression.test.ts',
     'tests/homestead.test.ts',
+    'tests/text.test.ts',
 ];
 
 /**

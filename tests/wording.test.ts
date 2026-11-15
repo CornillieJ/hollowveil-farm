@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 
 import { ITEMS } from '../src/scripts/content/items';
-import { forThumbs } from '../src/scripts/game/wording';
+import { forThumbs } from '../src/scripts/content/wording';
 
 const KEYS = /\b(WASD|Shift|Tab)\b|\b([Pp]ress|[Hh]old|with) [EFJ]\b/;
 

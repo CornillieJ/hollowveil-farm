@@ -1,8 +1,8 @@
-import { addPanel, type CraftingHandle, type PanelHandle, type PanelRow, type StorylineHandle, type VillagersHandle } from '../kit';
+import { addPanel, addWording, type CraftingHandle, type PanelHandle, type PanelRow, type StorylineHandle, type VillagersHandle } from '../kit';
 import type { ItemRegistry } from '../game/items';
 import { POT_TIERS } from '../content/items';
 import { VILLAGERS } from '../content/villagers';
-import { worded } from './wording';
+import { THUMB_SWAPS } from '../content/wording';
 import { GUIDE } from '../content/guide';
 
 /**
@@ -27,7 +27,7 @@ export type JournalOptions = {
 
 
 export function setupJournal(game: Game, options: JournalOptions): PanelHandle {
-    const say = worded(game);
+    const say = addWording(game, THUMB_SWAPS);
     const name = (itemId: string): string => options.registry.resolve(itemId).name;
     const icon = (itemId: string): string => options.registry.resolve(itemId).icon ?? '';
     const who = (id: string): string => VILLAGERS.find((villager) => villager.id === id)?.name ?? id;

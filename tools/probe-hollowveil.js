@@ -315,9 +315,9 @@
     world.pockets.add('wheat', 2);
     world.dropInWorld('wheat', 2);
     world.pockets.remove('wheat', 2);
-    expect(world.drops.size === 1, 'a dropped stack lies on the ground');
+    expect(world.drops.lying.length === 1, 'a dropped stack lies on the ground');
     expect(world.saves.save(), 'the game saves');
-    for (const pickup of [...world.drops.keys()]) world.pickups.remove(pickup);
+    world.drops.clear();
     const saved = { coins: world.coins.value(), wood: have('wood'), tier: world.cookpot.station.tier };
     world.coins.set(1);
     world.cookpot.station.tier = 1;
@@ -329,8 +329,7 @@
     expect(world.farm.activeFields === 2, 'bought land comes back from the save');
     expect(world.nodes.nodes[0].depleted, 'the felled tree is still felled after a load');
     expect(step() === 'sleep', 'the story resumes at the same step');
-    expect(world.drops.size === 1 && world.pickups.objects.length >= 1, 'what was dropped is still lying there after a load');
-    for (const pickup of [...world.drops.keys()]) world.pickups.remove(pickup);
+    expect(world.drops.lying.length === 1 && world.pickups.objects.length >= 1, 'what was dropped is still lying there after a load');
     world.drops.clear();
 
     // 13. Settings apply and stick.
