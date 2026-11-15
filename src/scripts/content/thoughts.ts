@@ -11,10 +11,7 @@
  * `{name}` in a line is filled in by the game with `fill`.
  */
 
-/** Fill `{name}` slots in lines with values. */
-export function fill(lines: string[], values: Record<string, string | number>): string[] {
-    return lines.map((line) => line.replace(/\{(\w+)\}/g, (slot, key: string) => (key in values ? String(values[key]) : slot)));
-}
+export { fill } from '../kit';
 
 /** Thought once, the first time something happens. Looked up by id. */
 export const THOUGHTS: Record<string, string[]> = {

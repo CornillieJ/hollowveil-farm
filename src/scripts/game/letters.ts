@@ -5,10 +5,9 @@ import { SYSTEM_ORDER } from '../core/systems';
 import { createBillboardLabel, faceCamera } from '../helpers/text';
 import { DialogueBox } from '../ui/dialogue-box';
 import { createHollow, dressFolk, FolkAnimator } from '../content/folk';
-import { takePortrait } from './portraits';
 import { modelled } from './models';
 import { LETTERS, PELL_SPEAKS } from '../content/letters';
-import type { NarrationHandle } from '../kit';
+import { takePortrait, type NarrationHandle } from '../kit';
 
 /**
  * The mailbox by the porch, and the one who fills it.
