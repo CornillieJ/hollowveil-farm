@@ -1,10 +1,10 @@
+import { swapWords, type WordSwap } from '../kit';
+
 /**
- * The same instructions, said for thumbs.
- *
- * Every line is written once, for a keyboard. On a phone the keys it names are
- * swapped for the buttons that are on the screen, longest phrase first.
+ * What a line written for a keyboard says on a phone instead. Longest phrase
+ * first, so it wins over the short ones inside it. Used through `addWording`.
  */
-const SWAPS: Array<[RegExp, string]> = [
+export const THUMB_SWAPS: WordSwap[] = [
     [/Walk with WASD, look with the mouse[,.] [Hh]old Shift to run\./g, 'Walk with the stick on the left, drag the screen to look, hold :run: to run.'],
     [/WASD to walk, E to interact, F to use what you hold, 1 to 8 to pick it, Tab for the bag, J for the notebook/g, 'Stick to walk, :hand: to interact, :use: to use what you hold, :bag: for the bag, :notebook: for the notebook'],
     [/W pedals, A and D steer, E gets off/g, 'the stick pedals and steers, :hand: gets off'],
@@ -21,11 +21,5 @@ const SWAPS: Array<[RegExp, string]> = [
     [/\bwith F\b/g, 'with :use:'],
 ];
 
-export function forThumbs(text: string): string {
-    return SWAPS.reduce((line, [from, to]) => line.replace(from, to), text);
-}
-
-/** `forThumbs` on a touch screen, the line as written anywhere else. */
-export function worded(game: Game): (text: string) => string {
-    return game.device.touch ? forThumbs : (text) => text;
-}
+/** A line as a phone shows it. */
+export const forThumbs = (text: string): string => swapWords(text, THUMB_SWAPS);

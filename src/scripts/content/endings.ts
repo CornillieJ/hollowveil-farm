@@ -1,4 +1,4 @@
-import type { EndingSlide } from '../game/ending';
+import type { EndingSlide } from '../kit';
 
 /** The 2 ways the game ends, a picture and a sentence at a time. */
 export const WAKE_SLIDES: EndingSlide[] = [

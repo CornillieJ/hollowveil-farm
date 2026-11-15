@@ -24,6 +24,14 @@ import {
     addLivestock,
     addMount,
     addNarration,
+    addCompanion,
+    addDevTools,
+    addDrops,
+    addEnding,
+    addThoughts,
+    addWording,
+    buildDog,
+    takePortrait,
     addPack,
     addPopulation,
     addResource,
@@ -60,23 +68,19 @@ import { setupScarecrows } from './scarecrows';
 import { setupRegulars } from './regulars';
 import { REGULARS } from '../content/regulars';
 import { SIGN_SPOT, setupWrongness } from './wrongness';
-import { setupEnding } from './ending';
 import { HELD_PLACEHOLDER, setupPlates, type PlatesHandle } from './plates';
 import { setupOmens } from './omens';
 import { setupDread } from './dread';
 import { setupTutorial } from './tutorial';
-import { worded } from './wording';
 import { setupWeather } from './weather';
 import { setupWhispers } from './whispers';
 import { setupPool } from './pool';
 import { registerGameIcons } from '../content/icons';
-import { takePortrait } from './portraits';
+import { THUMB_SWAPS } from '../content/wording';
 import { setupJournal } from './journal';
 import { setupLetters } from './letters';
 import { DAYS_LOST, ESCAPE, setupEscape } from './escape';
 import { setupBlooms } from './blooms';
-import { setupDevMode } from './devmode';
-import { setupDog } from './dog';
 import { setupFishing } from './fishing';
 import { GOLDEN, setupGolden } from './golden';
 import { PEDLAR, PEDLAR_STOCK, setupPedlar } from './pedlar';
@@ -149,7 +153,7 @@ export async function boot(): Promise<void> {
     const look = addRetroLook(game, { resolutionScale: 0.36, psx: { colorLevels: 28, dither: 0.7 }, vhs: { wobble: 0.5, saturation: 0.72, noise: 0.07 } });
     game.renderer.toneMappingExposure = 1.1;
 
-    const say = worded(game);
+    const say = addWording(game, THUMB_SWAPS);
     if (game.device.touch) for (const item of ITEMS) if (item.description) item.description = say(item.description);
 
     const refs = await buildWorld(game);
@@ -185,41 +189,9 @@ export async function boot(): Promise<void> {
     const bag = addInventory(game, { items: ITEMS, capacity: BAG_SLOTS[0] as number, title: 'Backpack', persist: 'bag', primary: false });
     const chest = addInventory(game, { items: ITEMS, capacity: 16, title: 'Chest', persist: 'chest', primary: false });
 
-    /** What is dropped lies on the ground in front of the farmer until it is picked up again. */
-    const dropInWorld = (itemId: string, amount: number): void => {
-        const player = game.player;
-        if (!player) return;
-        const yaw = player.root.rotation.y;
-        const x = player.position.x + Math.sin(yaw) * 1.3;
-        const z = player.position.z + Math.cos(yaw) * 1.3;
-        // At the farmer's own height: the ground is not always what is underfoot.
-        layDown({ itemId, amount, x, y: player.position.y + 0.45, z });
-    };
-    /** What lies about, so it is still there after a reload. */
-    type Drop = { itemId: string; amount: number; x: number; y: number; z: number };
-    const drops = new Map<THREE.Object3D, Drop>();
-    const layDown = (drop: Drop): void => {
-        const name = pockets.inventory.registry.resolve(drop.itemId).name;
-        const pickup = world.pickups.spawn({
-            position: new THREE.Vector3(drop.x, drop.y, drop.z),
-            itemId: drop.itemId,
-            amount: drop.amount,
-            collect: 'interact',
-            prompt: `Pick up ${drop.amount > 1 ? `${drop.amount} ` : ''}${name.toLowerCase()}`,
-            color: 0xd8c8a0,
-            size: 0.22,
-            onCollect: (_game, object) => drops.delete(object),
-        });
-        drops.set(pickup, drop);
-    };
-    game.save.register('drops', {
-        save: (): Drop[] => [...drops.values()],
-        load: (data) => {
-            for (const pickup of drops.keys()) world.pickups.remove(pickup);
-            drops.clear();
-            for (const drop of Array.isArray(data) ? (data as Drop[]) : []) if (pockets.inventory.registry.get(drop.itemId)) layDown(drop);
-        },
-    });
+    /** What is dropped lies on the ground in front of the farmer until it is picked up again, also after a reload. */
+    const drops = addDrops(game, { pickups: world.pickups, name: (itemId) => pockets.inventory.registry.get(itemId)?.name, persist: 'drops' });
+    const dropInWorld = drops.drop;
     const stats = (): Array<{ icon: string; label: string; value: string }> => [
         { icon: ':heart:', label: 'Health', value: `${Math.ceil(game.player?.health.current ?? 0)}/${game.player?.health.max ?? 100}` },
         { icon: ':coin:', label: 'Coins', value: coin(coins.value()) },
@@ -293,7 +265,8 @@ export async function boot(): Promise<void> {
 
     /** Counted for the story and the journal, and saved with the day. */
     const tally = { fished: 0, harvested: 0, cooked: 0, wood: 0, wrapped: 0, bigJobs: 0, bestStreak: 0, bestDay: 0, dodged: 0, regulars: 0, stayed: 0, burned: 0 };
-    const thoughts = new Set<string>();
+    const thinker = addThoughts(game, { narration, lines: THOUGHTS });
+    const thoughts = thinker.said;
 
     /** The watering can holds this many waterings, and is filled at the well. */
     const CAN_SIZES = [5, 10, 20];
@@ -1685,12 +1658,9 @@ export async function boot(): Promise<void> {
     };
     const villagerSpot = (id: string | undefined): { x: number; z: number } | undefined => (id ? game.scene.getObjectByName(`villager-${id}`)?.position : undefined);
 
-    /** Something the farmer thinks once, the first time it comes up. */
     /** Think something once. The lines come from `THOUGHTS` unless given. */
-    function think(id: string, lines: string[] | undefined = THOUGHTS[id]): void {
-        if (!lines || thoughts.has(id) || !game.state.is('playing')) return;
-        thoughts.add(id);
-        void narration.speak(lines);
+    function think(id: string, lines?: string[]): void {
+        thinker.think(id, lines);
     }
     /**
      * Nobody can get stuck. A farmer with no seeds, nothing growing and no money
@@ -1734,18 +1704,23 @@ export async function boot(): Promise<void> {
     });
 
     // A stray on the porch after the first night. Its nose is better than the farmer's eyes.
-    const dog = setupDog(game, {
+    const dogBody = buildDog();
+    dogBody.root.name = 'dog';
+    const dog = addCompanion(game, {
+        parts: dogBody,
+        pet: { prompt: 'Pet the dog' },
+        persist: 'dog',
         ground,
         threat: (position, within) => world.enemies.nearest(position, within)?.root.position,
         wary: () => !safeZones.playerSafe && !barn.inside,
         here: () => dayCycle.day >= 2,
-        growl: () => {
+        onAlert: () => {
             synth.noise({ duration: 0.7, gain: 0.09, filter: 160 });
             synth.tone({ frequency: 82, duration: 0.7, type: 'sawtooth', gain: 0.05, sweep: 0.85 });
             think('dog-growl');
         },
         day: () => dayCycle.day,
-        onPet: (position, first, gift) => {
+        onPet: (position, { first, gift }) => {
             juice.sparkle(position, 0xff9ab0, 8);
             juice.chime('tick');
             body.play('reach');
@@ -1887,7 +1862,7 @@ export async function boot(): Promise<void> {
         // Paid in full: this is the night the farmer does not wake up here.
         if (escape.pledge.state === 'kept') {
             saves.save();
-            void ending.play({ kind: 'wake', title: 'You woke up', slides: WAKE_SLIDES, tally: lifeTally(), button: 'Wake' }).then(() => world.flow.win());
+            void ending.play({ theme: 'wake', closing: ':sprout:', title: 'You woke up', slides: WAKE_SLIDES, tally: lifeTally(), button: 'Wake' }).then(() => world.flow.win());
             return;
         }
         // The last day went by unpaid: this is the night the farmer stops being a visitor.
@@ -1897,7 +1872,7 @@ export async function boot(): Promise<void> {
             nightLine = 'You slept well. You always sleep well now.';
             sleep();
             deeds.award('stayed');
-            void ending.play({ kind: 'stay', title: 'You stayed', slides: STAY_SLIDES, tally: lifeTally(), button: 'Go on living here' }).then(() => morning.open());
+            void ending.play({ theme: 'stay', closing: ':fog:', title: 'You stayed', slides: STAY_SLIDES, tally: lifeTally(), button: 'Go on living here' }).then(() => morning.open());
             return;
         }
         tally.bestDay = Math.max(tally.bestDay, today.earned);
@@ -1907,7 +1882,7 @@ export async function boot(): Promise<void> {
         morning.open();
     }
 
-    const ending = setupEnding(game);
+    const ending = addEnding(game);
     /** What a life here came to, for the last card of an ending. */
     const lifeTally = (): Array<{ label: string; value: string }> => [
         { label: 'Days in Hollowveil', value: String(dayCycle.day) },
@@ -2012,34 +1987,37 @@ export async function boot(): Promise<void> {
         world.player.body.teleport(at(spot, 0.3));
         world.controls.snap();
     };
-    const devmode = setupDevMode(game, [
-        { label: 'Skip tutorial (free to leave the farm)', run: () => (skipTo('take'), void give('turnip-soup', 1)) },
-        { label: 'Finish tutorial (the Hollow start hunting)', run: () => skipTo('deliver') },
-        ...[100, 1000, 10000].map((amount) => ({ label: `Give ${coin(amount)}`, run: () => coins.add(amount) })),
-        { label: 'Give seeds, wood and food', run: () => [...CROPS.map((crop) => [crop.seed as string, 10] as const), ['wood', 10] as const, ['turnip-soup', 3] as const, ['egg', 4] as const, ['milk', 4] as const, ['candle', 3] as const, ['lantern', 1] as const].forEach(([id, amount]) => void give(id, amount)) },
-        { label: 'Buy every upgrade', run: () => (coins.add(10000), upgrades.upgrades.definitions.forEach((definition) => definition.levels.forEach(() => upgrades.buy(definition.id)))) },
-        { label: 'Heal', run: () => game.player?.heal(999) },
-        { label: 'Trigger event: the village is ringed (siege)', run: () => happenings.trigger('siege') },
-        { label: 'Trigger event: the farm is overrun', run: () => happenings.trigger('overrun') },
-        { label: 'Weather: rain', run: () => weather.force('rain', 4) },
-        { label: 'Weather: thick Veil', run: () => weather.force('thick', 4) },
-        { label: 'Weather: clear night', run: () => weather.force('clear', 4) },
-        { label: 'Weather: stop', run: () => weather.stop() },
-        ...(['walker', 'crawler', 'watcher'] as HollowKind[]).map((kind) => ({ label: `Spawn a ${kind} ahead`, run: () => void spawnHollow(world.enemies, terrain.point(nearPlayer(12).x, nearPlayer(12).z, 0.4), { night: isNight(dayCycle), hunting: true, kind }) })),
-        { label: 'Remove every Hollow', run: () => population.clear() },
-        { label: 'Time: morning (07:00)', run: () => dayCycle.setHour(7) },
-        { label: 'Time: dusk (19:00)', run: () => dayCycle.setHour(19) },
-        { label: 'Time: night (23:00)', run: () => dayCycle.setHour(23) },
-        { label: 'Sleep to the next day', run: () => (world.flow.resume(), void goToBed()) },
-        { label: 'Go to the farm', run: () => moveTo(FARM.start) },
-        { label: 'Go to the village', run: () => moveTo({ x: VILLAGE.center.x - 4, z: VILLAGE.center.z + 6 }) },
-        { label: 'Go to Pell on the hill', run: () => moveTo({ x: PELL_SPOT.x + 2, z: PELL_SPOT.z + 2 }) },
-        { label: 'Go to the black pool', run: () => moveTo({ x: PLACES.pool.x - 10, z: PLACES.pool.z - 15 }) },
-        { label: 'Dig up a buried thing', run: () => void dig(game.player?.position ?? at(FARM.start), true) },
-        { label: 'Make the dog arrive now', run: () => (dayCycle.day = Math.max(2, dayCycle.day)) },
-        { label: 'Bring the pedlar today', run: () => (pedlarForced = dayCycle.day) },
-        { label: 'Turn ripe crops gold', run: () => farm.plots.filter((plot) => plot.ripe).forEach((plot) => golden.make(plot)) },
-    ]);
+    const devmode = addDevTools(game, {
+        namespace: 'hollowveil-farm',
+        actions: [
+            { label: 'Skip tutorial (free to leave the farm)', run: () => (skipTo('take'), void give('turnip-soup', 1)) },
+            { label: 'Finish tutorial (the Hollow start hunting)', run: () => skipTo('deliver') },
+            ...[100, 1000, 10000].map((amount) => ({ label: `Give ${coin(amount)}`, run: () => coins.add(amount) })),
+            { label: 'Give seeds, wood and food', run: () => [...CROPS.map((crop) => [crop.seed as string, 10] as const), ['wood', 10] as const, ['turnip-soup', 3] as const, ['egg', 4] as const, ['milk', 4] as const, ['candle', 3] as const, ['lantern', 1] as const].forEach(([id, amount]) => void give(id, amount)) },
+            { label: 'Buy every upgrade', run: () => (coins.add(10000), upgrades.upgrades.definitions.forEach((definition) => definition.levels.forEach(() => upgrades.buy(definition.id)))) },
+            { label: 'Heal', run: () => game.player?.heal(999) },
+            { label: 'Trigger event: the village is ringed (siege)', run: () => happenings.trigger('siege') },
+            { label: 'Trigger event: the farm is overrun', run: () => happenings.trigger('overrun') },
+            { label: 'Weather: rain', run: () => weather.force('rain', 4) },
+            { label: 'Weather: thick Veil', run: () => weather.force('thick', 4) },
+            { label: 'Weather: clear night', run: () => weather.force('clear', 4) },
+            { label: 'Weather: stop', run: () => weather.stop() },
+            ...(['walker', 'crawler', 'watcher'] as HollowKind[]).map((kind) => ({ label: `Spawn a ${kind} ahead`, run: () => void spawnHollow(world.enemies, terrain.point(nearPlayer(12).x, nearPlayer(12).z, 0.4), { night: isNight(dayCycle), hunting: true, kind }) })),
+            { label: 'Remove every Hollow', run: () => population.clear() },
+            { label: 'Time: morning (07:00)', run: () => dayCycle.setHour(7) },
+            { label: 'Time: dusk (19:00)', run: () => dayCycle.setHour(19) },
+            { label: 'Time: night (23:00)', run: () => dayCycle.setHour(23) },
+            { label: 'Sleep to the next day', run: () => (world.flow.resume(), void goToBed()) },
+            { label: 'Go to the farm', run: () => moveTo(FARM.start) },
+            { label: 'Go to the village', run: () => moveTo({ x: VILLAGE.center.x - 4, z: VILLAGE.center.z + 6 }) },
+            { label: 'Go to Pell on the hill', run: () => moveTo({ x: PELL_SPOT.x + 2, z: PELL_SPOT.z + 2 }) },
+            { label: 'Go to the black pool', run: () => moveTo({ x: PLACES.pool.x - 10, z: PLACES.pool.z - 15 }) },
+            { label: 'Dig up a buried thing', run: () => void dig(game.player?.position ?? at(FARM.start), true) },
+            { label: 'Make the dog arrive now', run: () => (dayCycle.day = Math.max(2, dayCycle.day)) },
+            { label: 'Bring the pedlar today', run: () => (pedlarForced = dayCycle.day) },
+            { label: 'Turn ripe crops gold', run: () => farm.plots.filter((plot) => plot.ripe).forEach((plot) => golden.make(plot)) },
+        ],
+    });
 
     const settings = addSettings(game, {
         namespace: 'hollowveil-farm',

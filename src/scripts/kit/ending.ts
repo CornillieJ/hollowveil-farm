@@ -1,26 +1,38 @@
 import { div } from '../helpers/dom';
 
+//#region Ending
+
 /**
- * An ending, told.
+ * An ending, told a card at a time.
  *
- * The screen closes over the valley and the last of the story is read a card
- * at a time: a small picture, a few lines, a key or a tap for the next. The
- * final card adds up what the farmer did here. The game is held still
- * underneath until the last button is pressed.
+ * The screen closes over the game and the last of the story is read one card
+ * per key press or tap: a large picture (an icon or a glyph) and a sentence.
+ * A final card adds up what the player did. The game is held still underneath
+ * until the last button is pressed.
+ *
+ * ```ts
+ * const ending = addEnding(game);
+ * await ending.play({ theme: 'dawn', title: 'You got out', slides: [{ picture: ':sun:', text: 'Morning.' }], tally: [{ label: 'Days', value: '12' }], button: 'Main menu' });
+ * ```
+ *
+ * The base look is in `style.css` under `.ending`. A game colours each theme
+ * with `.ending.is-<theme>.is-open { background; color }`.
  */
 export type EndingSlide = {
-    /** The picture: one or two glyphs, drawn large and coarse. */
+    /** One or two glyphs or `:icon:` names, drawn large. */
     picture: string;
     text: string;
 };
 
-export type EndingOptions = {
-    /** `wake` closes to white, `stay` to the colour of the Veil. */
-    kind: 'wake' | 'stay';
+export type EndingPlayOptions = {
+    /** Added to the overlay as `is-<theme>`, for colouring. */
+    theme?: string;
     title: string;
     slides: EndingSlide[];
-    /** Lines for the last card, e.g. days lived and requests filled. */
-    tally: Array<{ label: string; value: string }>;
+    /** Lines for the last card, e.g. days lived. */
+    tally?: Array<{ label: string; value: string }>;
+    /** The picture on the last card. Default: the first slide's. */
+    closing?: string;
     /** What the button on the last card says. */
     button: string;
 };
@@ -29,12 +41,12 @@ export type EndingHandle = {
     /** True while an ending is on the screen. */
     readonly playing: boolean;
     /** Show an ending. Resolves when the last button is pressed. */
-    play: (options: EndingOptions) => Promise<void>;
-    /** For tests: go to the next card, or press the last button. */
+    play: (options: EndingPlayOptions) => Promise<void>;
+    /** Go to the next card, or press the last button. For tests. */
     next: () => void;
 };
 
-export function setupEnding(game: Game): EndingHandle {
+export function addEnding(game: Game): EndingHandle {
     const root = div('ending is-hidden');
     game.screens.layer('overlay').appendChild(root);
     const card = div('ending-card', undefined, root);
@@ -48,6 +60,7 @@ export function setupEnding(game: Game): EndingHandle {
     card.appendChild(button);
 
     let advance: (() => void) | undefined;
+    let theme = '';
     const press = (): void => advance?.();
     root.addEventListener('pointerdown', (event) => {
         if (event.target !== button) press();
@@ -68,12 +81,14 @@ export function setupEnding(game: Game): EndingHandle {
         true,
     );
 
-    const play = (options: EndingOptions): Promise<void> =>
+    const play = (options: EndingPlayOptions): Promise<void> =>
         new Promise((resolve) => {
             game.time.setPaused(root, true);
             game.screens.show('overlay', root);
-            root.classList.remove('is-hidden', 'is-wake', 'is-stay', 'is-open');
-            root.classList.add(`is-${options.kind}`);
+            root.classList.remove('is-hidden', 'is-open');
+            if (theme) root.classList.remove(`is-${theme}`);
+            theme = options.theme ?? '';
+            if (theme) root.classList.add(`is-${theme}`);
             // The next frame, so the closing-over is a transition and not a cut.
             requestAnimationFrame(() => root.classList.add('is-open'));
             let index = -1;
@@ -93,11 +108,11 @@ export function setupEnding(game: Game): EndingHandle {
                     return;
                 }
                 if (index === options.slides.length) {
-                    picture.textContent = options.kind === 'wake' ? ':sprout:' : ':fog:';
+                    picture.textContent = options.closing ?? options.slides[0]?.picture ?? '';
                     title.textContent = options.title;
                     text.textContent = '';
                     tally.replaceChildren();
-                    for (const line of options.tally) {
+                    for (const line of options.tally ?? []) {
                         const row = div('ending-tally-row', undefined, tally);
                         div('ending-tally-label', line.label, row);
                         div('ending-tally-value', line.value, row);
@@ -127,4 +142,4 @@ export function setupEnding(game: Game): EndingHandle {
     };
 }
 
-
+//#endregion Ending

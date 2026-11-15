@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 
-import { addStoryline, type MountHandle, type NarrationHandle, type StorylineHandle, type StoryStep } from '../kit';
+import { addStoryline, addWording, type MountHandle, type NarrationHandle, type StorylineHandle, type StoryStep } from '../kit';
 import { TURNED_BACK, TUTORIAL } from '../content/tutorial';
 import { FARM, VILLAGE } from '../content/world';
 import type { Farm } from './farm';
-import { worded } from './wording';
+import { THUMB_SWAPS } from '../content/wording';
 
 /**
  * The first day, one small thing at a time, told by the farmer thinking aloud.
@@ -228,7 +228,7 @@ export function setupTutorial(game: Game, options: TutorialOptions): TutorialHan
         },
     ];
 
-    const worded_ = worded(game);
+    const worded_ = addWording(game, THUMB_SWAPS);
     for (const step of steps) {
         if (typeof step.detail === 'string') step.detail = worded_(step.detail);
         if (Array.isArray(step.say)) step.say = step.say.map(worded_);

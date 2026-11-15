@@ -315,3 +315,7 @@ Work on branch `fun-iteration`, one addition per commit.
 - Guide fixed where it disagreed with the game: dying costs 2 days, fish supper needs a turnip, the store's full stock. New guide pages for the pedlar and golden crops. The iron pot lists bloom tea.
 - The daily craving never picks a dish that needs a pale fish or a veilbloom.
 - Reworded: the night delivery thought, the barn, the dusk thought, the intro, the chop step, the scarecrow carried back.
+
+## Batch 26: game code moved into the kit
+- Now from the template kit: `addDevTools` (was `devmode.ts`), `addWording` (was `wording.ts`; the swaps are `content/wording.ts`), `addThoughts` and `fill` (the `think` helper), `addDrops` (dropped stacks), `addEnding` (was `ending.ts`; Hollowveil only colours the `wake` and `stay` themes in `hollowveil.css`), `takePortrait` (was `portraits.ts`) and `addCompanion` with `buildDog` (was `dog.ts`).
+- Kept in the game on purpose, too specific for a template: food heat, weather, the mailbox, the crate, the notebook, fishing, lanterns.
